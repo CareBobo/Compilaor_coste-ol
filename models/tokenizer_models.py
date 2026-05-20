@@ -1,7 +1,8 @@
 import re
 class Tokenizer:
     def __init__(self, rules):
-        self.rules = sorted([(key, re.compile(pattern)) for key, pattern in rules.items()], key=lambda x: x[0], reverse=True)
+        # Compilar los patrones sin distinguir mayúsculas/minúsculas
+        self.rules = sorted([(key, re.compile(pattern, re.IGNORECASE)) for key, pattern in rules.items()], key=lambda x: x[0], reverse=True)
         self.variables = {}
 
     def tokenize(self, text):
@@ -27,7 +28,7 @@ class Tokenizer:
 
         if tokens[0][0] == 'IDENTIFIER' and tokens[1][0] == 'TYPE' and tokens[2][0] == 'SEMICOLON':
             variable = tokens[0][1]
-            tipo_variable = tokens[1][1]  # Obtener el tipo de la variable de los tokens
+            tipo_variable = tokens[1][1].capitalize()  # Normalizar el tipo (Entero, Real, Texto)
 
             # Almacenar la variable con su tipo y un valor inicial
             self.variables[variable] = {'tipo': tipo_variable, 'valor': None}
@@ -49,21 +50,29 @@ class Tokenizer:
 
             # Verificar el tipo de asignación y el tipo de valor
             if valor[0] == 'METHOD_CALL':
-                tipo_metodo, valor_metodo = re.match(TOKENS['METHOD_CALL'], valor[1]).groups()
+                match_method = re.match(TOKENS['METHOD_CALL'], valor[1], re.IGNORECASE)
+                if not match_method:
+                    return {"consola": "", "logs": f"Error en llamada de método para {variable}"}
+                tipo_metodo, valor_metodo = match_method.groups()
+                tipo_metodo = tipo_metodo.capitalize()
 
                 # Verificar si el tipo del método coincide con el tipo de la variable
                 if tipo_metodo != tipo_variable:
                     return {"consola": "", "logs": f"Error en la línea: Tipo de dato no coincide para {variable}. Esperado: {tipo_variable}, Obtenido: {tipo_metodo}"}
 
                 # Validaciones adicionales según el tipo del método
-                if tipo_metodo == 'Entero' and not re.fullmatch(TOKENS['ENTERO'], valor_metodo):
-                    return {"consola": "", "logs": f"Error Captura.Entero: argumento inválido"}
-                elif tipo_metodo == 'Real' and not re.fullmatch(TOKENS['REAL'], valor_metodo):
-                    return {"consola": "", "logs": f"Error Captura.Real: argumento inválido"}
-                elif tipo_metodo == 'Texto' and not re.fullmatch(TOKENS['TEXT'], valor_metodo):
-                    return {"consola": "", "logs": f"Error Captura.Texto: argumento inválido"}
+                # Si el paréntesis está vacío, asumimos captura en tiempo de ejecución y no validamos formato
+                if valor_metodo.strip() == '':
+                    self.variables[variable]['valor'] = None
+                else:
+                    if tipo_metodo == 'Entero' and not re.fullmatch(TOKENS['ENTERO'], valor_metodo):
+                        return {"consola": "", "logs": f"Error Captura.Entero: argumento inválido"}
+                    elif tipo_metodo == 'Real' and not re.fullmatch(TOKENS['REAL'], valor_metodo):
+                        return {"consola": "", "logs": f"Error Captura.Real: argumento inválido"}
+                    elif tipo_metodo == 'Texto' and not re.fullmatch(TOKENS['TEXT'], valor_metodo):
+                        return {"consola": "", "logs": f"Error Captura.Texto: argumento inválido"}
 
-                self.variables[variable]['valor'] = valor_metodo.strip('"')
+                    self.variables[variable]['valor'] = valor_metodo.strip('"')
                 return {"consola": "", "logs": "Asignación válida"}
             else:
                 # Validación para asignaciones directas según el tipo de la variable
@@ -86,13 +95,17 @@ class Tokenizer:
         numero_linea = 1  # Iniciar el conteo de líneas
 
         for linea in lineas:
+            # Ignorar líneas vacías (sin producir error)
+            if not linea.strip():
+                numero_linea += 1
+                continue
             try:
                 tokens = self.tokenize(linea.strip())
                 if tokens:
                     resultado_linea = self.procesar_linea(tokens, TOKENS)
                     resultados.append({"linea": numero_linea, "texto": linea, "resultado": resultado_linea})
                 else:
-                    resultados.append({"linea": numero_linea, "texto": linea, "resultado": {"consola": "Línea vacía o no reconocida", "logs": ""}})
+                    resultados.append({"linea": numero_linea, "texto": linea, "resultado": {"consola": "", "logs": ""}})
             except ValueError as e:
                 resultados.append({"linea": numero_linea, "texto": linea, "resultado": {"consola": "", "logs": str(e)}})
                 break  # Detener el análisis al encontrar el primer error
@@ -108,7 +121,7 @@ class Tokenizer:
         if print_call[0] != 'PRINT_CALL' or semi[0] != 'SEMICOLON':
             return {"consola": "", "logs": "Error en la llamada de impresión"}
 
-        argumento_match = re.match(TOKENS['PRINT_CALL'], print_call[1])
+        argumento_match = re.match(TOKENS['PRINT_CALL'], print_call[1], re.IGNORECASE)
         if argumento_match:
             argumento = argumento_match.group(1)
 

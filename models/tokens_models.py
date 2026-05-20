@@ -6,7 +6,8 @@ TOKENS = {
     'ENTERO': r'\d+',  # Números enteros
     'IDENTIFIER': r'[a-zA-Z_]\w*',  # Identificadores
     'ASSIGNMENT': r'=',
-    'METHOD_CALL': r'Captura\.(Texto|Entero|Real)\(([^)]+)\)',
+    # Permitir paréntesis vacíos para llamadas de captura (ej. Captura.Texto())
+    'METHOD_CALL': r'Captura\.(Texto|Entero|Real)\(([^)]*)\)',
     'PRINT_CALL': r'Mensaje\.Texto\(([^)]+)\)'
 }
 
